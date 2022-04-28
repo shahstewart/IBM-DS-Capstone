@@ -1,26 +1,24 @@
 import wget
 import pandas as pd
+import numpy as np
 import dash
 from dash import html
 from dash import dcc
 from dash.dependencies import Input, Output, State
 import plotly.express as px
-# import plotly.io as pio
-# import os
-# pio.renderers.default = 'browser'
+from os.path import exists
 
 #  # Get the data
-# os.chdir('15CapstoneProject')
-# url = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-DS0321EN-SkillsNetwork/datasets/spacex_launch_dash.csv'
-# wget.download(url, './data/')
+if not exists('./data/spacex_launch_dash.csv'):
+    url = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-DS0321EN-SkillsNetwork/datasets/spacex_launch_dash.csv'
+    wget.download(url, './data/')
+
 df = pd.read_csv('./data/spacex_launch_dash.csv')
 max_payload = df['Payload Mass (kg)'].max()
 min_payload = df['Payload Mass (kg)'].min()
 
-#  # Create the app
+#  # Create the app and its layout
 app = dash.Dash(__name__)
-
-#  # Create an app layout
 app.layout = html.Div(
     children=[
         html.H1('SpaceX Launch Records Dashboard',
@@ -65,22 +63,34 @@ app.layout = html.Div(
      State('scatter-chart', 'children')])
 def get_pie_plot(site, payload_range, c1, c2):
     site = site.strip()
-    p_df = df[(df['Payload Mass (kg)'] > payload_range[0]) & (df['Payload Mass (kg)'] < payload_range[1])]
+    p_df = df[(df['Payload Mass (kg)'] >= payload_range[0]) & (df['Payload Mass (kg)'] <= payload_range[1])]
+
     if site == 'ALL':
+        # pie plot
         pie_plot = px.pie(df, values='class', names='Launch Site', title='Pie Chart of Success Rate by Launch Site')
-        scatter_plot = px.scatter(p_df, x='Payload Mass (kg)', y='class', color='Booster Version Category',
-                                  title='Plot of Flight Outcomes for Payload Mass in the Selected Range')
+
+        # scatter plot, add jitter
+        p_df['class'] = p_df['class'] + np.random.normal(0, 2, p_df.shape[0]) * 0.015
+        scatter_plot = px.strip(p_df, x='Payload Mass (kg)', y='class', color='Booster Version Category',
+                                title='Plot of Flight Outcomes for Payload Mass in the Selected Range',
+                                stripmode='group', orientation='v')
         scatter_plot.update_yaxes(title=None, tickvals=[0, 1], ticktext=['Failure', 'Success'])
     else:
         site_df = df[df['Launch Site'] == site]
         site_df['outcome'] = site_df['class'].map(lambda x: 'Success' if x == 1 else 'Failure')
+
+        # pie plot
         pie_df = site_df['outcome'].value_counts()
-        p_df = site_df[(site_df['Payload Mass (kg)'] > payload_range[0]) & (site_df['Payload Mass (kg)'] < payload_range[1])]
         pie_plot = px.pie(pie_df, values='outcome', names=pie_df.keys(), color=pie_df.keys(),
                           color_discrete_map={'Success': 'rgb(99, 110, 250)', 'Failure': 'rgb(239, 85, 59)'},
-                          title='Pie chart of success/failure rates at Launch Site "'+site+'"')
+                          title='Pie chart of success/failure rates at Launch Site "' + site + '"')
+
+        # scatter: Add a bit of jitter so we can see all points
+        p_df = site_df[
+            (site_df['Payload Mass (kg)'] >= payload_range[0]) & (site_df['Payload Mass (kg)'] <= payload_range[1])]
+        p_df['class'] = p_df['class'] + np.random.normal(0, 2, p_df.shape[0]) * 0.015
         scatter_plot = px.scatter(p_df, x='Payload Mass (kg)', y='class', color='Booster Version Category',
-                                  title='Plot of Flight Outcome for Payload Mass in the Selected Range at Launch Site '+site)
+                                  title='Plot of Flight Outcome for Payload Mass in the Selected Range at Launch Site ' + site)
         scatter_plot.update_yaxes(title=None, tickvals=[0, 1], ticktext=['Failure', 'Success'])
 
     pie_plot.update_layout(title_x=0.5)
