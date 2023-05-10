@@ -2,8 +2,7 @@ import wget
 import pandas as pd
 import numpy as np
 import dash
-from dash import html
-from dash import dcc
+from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
 import plotly.express as px
 from os.path import exists
@@ -18,7 +17,7 @@ max_payload = df['Payload Mass (kg)'].max()
 min_payload = df['Payload Mass (kg)'].min()
 
 #  # Create the app and its layout
-app = dash.Dash(__name__)
+app = Dash(__name__)
 app.layout = html.Div(
     children=[
         html.H1('SpaceX Launch Records Dashboard',
